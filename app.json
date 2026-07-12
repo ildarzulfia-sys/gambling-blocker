@@ -1,15 +1,12 @@
 {
   "expo": {
     "name": "Gambling Blocker",
-    "slug": "gambling-blocker","owner": "men77s-team",
+    "slug": "gambling-blocker",
+    "owner": "men77s-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "android": {
-      "package": "com.ildarzulfia.gamblingblocker",
-      "permissions": [
-        "android.permission.BIND_VPN_SERVICE",
-        "android.permission.FOREGROUND_SERVICE"
-      ]
+      "package": "com.ildarzulfia.gamblingblocker"
     },
     "extra": {
       "eas": {
