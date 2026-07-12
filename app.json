@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Gambling Blocker",
+    "slug": "gambling-blocker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "android": {
+      "package": "com.ildarzulfia.gamblingblocker",
+      "permissions": [
+        "android.permission.BIND_VPN_SERVICE",
+        "android.permission.FOREGROUND_SERVICE"
+      ]
+    }
+  }
+}
