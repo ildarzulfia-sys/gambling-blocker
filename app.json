@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Gambling Blocker",
-    "slug": "gambling-blocker",
+    "slug": "gambling-blocker","owner": "men77s-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "android": {
