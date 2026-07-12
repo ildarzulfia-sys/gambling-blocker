@@ -8,7 +8,13 @@ import {
   StatusBar,
   SafeAreaView,
   Modal,
+  TextInput,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const SERVER_URL = 'https://gambling-blocker-server-production.up.railway.app';
 
 const COLORS = {
   bgPhone: '#0e1226',
@@ -35,9 +41,7 @@ function ProgressRing({ centerNumber, centerLabel, active }) {
     <View
       style={[
         styles.ringWrap,
-        {
-          borderColor: active ? COLORS.teal : '#3a3f66',
-        },
+        { borderColor: active ? COLORS.teal : '#3a3f66' },
       ]}
     >
       <Text style={styles.ringCenterNum}>{centerNumber}</Text>
@@ -47,9 +51,16 @@ function ProgressRing({ centerNumber, centerLabel, active }) {
 }
 
 export default function App() {
-  const [protectionEnabled, setProtectionEnabled] = useState(false);
-  const [lockUntil, setLockUntil] = useState(null);
-  const [lockDays, setLockDays] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [credentials, setCredentials] = useState(null); // {email, password}
+
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authBusy, setAuthBusy] = useState(false);
+
+  const [unlockAt, setUnlockAt] = useState(null);
   const [now, setNow] = useState(Date.now());
 
   const [durationVisible, setDurationVisible] = useState(false);
@@ -57,7 +68,6 @@ export default function App() {
 
   const [blockedToday, setBlockedToday] = useState(3);
   const [blockedWeek, setBlockedWeek] = useState(17);
-
   const [recentActivity, setRecentActivity] = useState([
     { domain: '1xbet-mirror.com', time: '14:32' },
     { domain: 'melbet-kz.net', time: '11:05' },
@@ -69,7 +79,65 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  const isLocked = lockUntil !== null && now < lockUntil;
+  useEffect(() => {
+    (async () => {
+      const saved = await AsyncStorage.getItem('gb_credentials');
+      if (saved) {
+        const creds = JSON.parse(saved);
+        setCredentials(creds);
+        await refreshStatus(creds);
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  const refreshStatus = async (creds) => {
+    try {
+      const res = await fetch(SERVER_URL + '/api/block/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(creds),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUnlockAt(data.unlockAt);
+      }
+    } catch (e) {
+      // network error, ignore for now
+    }
+  };
+
+  const handleAuth = async () => {
+    setAuthError('');
+    if (!emailInput || !passwordInput) {
+      setAuthError('Введите email и пароль');
+      return;
+    }
+    setAuthBusy(true);
+    try {
+      const endpoint = authMode === 'login' ? '/api/login' : '/api/register';
+      const res = await fetch(SERVER_URL + endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailInput, password: passwordInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAuthError(data.error || 'Ошибка');
+        setAuthBusy(false);
+        return;
+      }
+      const creds = { email: emailInput, password: passwordInput };
+      await AsyncStorage.setItem('gb_credentials', JSON.stringify(creds));
+      setCredentials(creds);
+      await refreshStatus(creds);
+    } catch (e) {
+      setAuthError('Нет связи с сервером');
+    }
+    setAuthBusy(false);
+  };
+
+  const isLocked = unlockAt !== null && now < unlockAt;
 
   const formatDate = (ts) => {
     const d = new Date(ts);
@@ -81,7 +149,7 @@ export default function App() {
   };
 
   const daysRemaining = isLocked
-    ? Math.max(0, Math.ceil((lockUntil - now) / (24 * 60 * 60 * 1000)))
+    ? Math.max(0, Math.ceil((unlockAt - now) / (24 * 60 * 60 * 1000)))
     : 0;
 
   const openDurationPicker = () => {
@@ -94,12 +162,23 @@ export default function App() {
     setConfirmOption(option);
   };
 
-  const confirmLock = () => {
-    if (!confirmOption) return;
-    const until = Date.now() + confirmOption.days * 24 * 60 * 60 * 1000;
-    setLockUntil(until);
-    setLockDays(confirmOption.days);
-    setProtectionEnabled(true);
+  const confirmLock = async () => {
+    if (!confirmOption || !credentials) return;
+    try {
+      const res = await fetch(SERVER_URL + '/api/block/enable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...credentials, days: confirmOption.days }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUnlockAt(data.unlockAt);
+      } else {
+        Alert.alert('Ошибка', data.error || 'Не удалось включить защиту');
+      }
+    } catch (e) {
+      Alert.alert('Ошибка', 'Нет связи с сервером');
+    }
     setConfirmOption(null);
   };
 
@@ -121,6 +200,84 @@ export default function App() {
     setRecentActivity((prev) => [{ domain, time }, ...prev].slice(0, 5));
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, styles.centerAll]}>
+        <ActivityIndicator size="large" color={COLORS.teal} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!credentials) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.bgPhone} />
+        <View style={styles.authContainer}>
+          <View style={styles.logoBadge}>
+            <Text style={styles.logoEmoji}>🛡️</Text>
+          </View>
+          <Text style={styles.title}>Gambling Blocker</Text>
+          <Text style={styles.authSubtitle}>
+            {authMode === 'login' ? 'Вход в аккаунт' : 'Создание аккаунта'}
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            placeholderTextColor={COLORS.textTertiary}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            value={emailInput}
+            onChangeText={setEmailInput}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Пароль"
+            placeholderTextColor={COLORS.textTertiary}
+            secureTextEntry
+            value={passwordInput}
+            onChangeText={setPasswordInput}
+          />
+
+          {!!authError && <Text style={styles.authError}>{authError}</Text>}
+
+          <TouchableOpacity
+            style={styles.btnPrimary}
+            onPress={handleAuth}
+            disabled={authBusy}
+          >
+            {authBusy ? (
+              <ActivityIndicator color="#08221c" />
+            ) : (
+              <Text style={styles.btnPrimaryText}>
+                {authMode === 'login' ? 'Войти' : 'Зарегистрироваться'}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.cancelLink}
+            onPress={() => {
+              setAuthMode(authMode === 'login' ? 'register' : 'login');
+              setAuthError('');
+            }}
+          >
+            <Text style={styles.cancelLinkText}>
+              {authMode === 'login'
+                ? 'Нет аккаунта? Зарегистрироваться'
+                : 'Уже есть аккаунт? Войти'}
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={styles.authHint}>
+            Аккаунт нужен, чтобы защита не сбрасывалась при переустановке
+            приложения или сбросе телефона
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.bgPhone} />
@@ -138,16 +295,16 @@ export default function App() {
               <View
                 style={[
                   styles.dot,
-                  { backgroundColor: protectionEnabled ? COLORS.teal : COLORS.textTertiary },
+                  { backgroundColor: isLocked ? COLORS.teal : COLORS.textTertiary },
                 ]}
               />
               <Text
                 style={[
                   styles.subtitle,
-                  { color: protectionEnabled ? COLORS.teal : COLORS.textSecondary },
+                  { color: isLocked ? COLORS.teal : COLORS.textSecondary },
                 ]}
               >
-                {protectionEnabled ? 'Защита активна' : 'Защита отключена'}
+                {isLocked ? 'Защита активна' : 'Защита отключена'}
               </Text>
             </View>
           </View>
@@ -170,11 +327,11 @@ export default function App() {
                 {isLocked ? 'Обязательство принято' : 'Статус'}
               </Text>
               <Text style={styles.ringValue}>
-                {isLocked ? `До ${formatDate(lockUntil)}` : 'Защита выключена'}
+                {isLocked ? `До ${formatDate(unlockAt)}` : 'Защита выключена'}
               </Text>
               <Text style={styles.ringHint}>
                 {isLocked
-                  ? `Вы выбрали ${confirmOption ? confirmOption.label.toLowerCase() : `${lockDays} дней`}. Отменить это решение нельзя — это и есть весь смысл.`
+                  ? 'Отменить это решение нельзя — это и есть весь смысл. Даже переустановка приложения не поможет.'
                   : 'Выберите срок и включите — до конца срока отключить будет нельзя.'}
               </Text>
             </View>
@@ -274,8 +431,8 @@ export default function App() {
             <Text style={styles.sheetTitle}>Вы уверены?</Text>
             <Text style={styles.sheetSub}>
               После включения отключить защиту будет невозможно{' '}
-              {confirmOption ? confirmOption.label.toLowerCase() : ''}. Кнопка
-              заблокируется до этой даты.
+              {confirmOption ? confirmOption.label.toLowerCase() : ''}. Это
+              действует даже при переустановке приложения.
             </Text>
             <TouchableOpacity
               style={[styles.optionButton, styles.confirmButton]}
@@ -300,6 +457,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.bgPhone },
+  centerAll: { alignItems: 'center', justifyContent: 'center' },
   container: { padding: 20, paddingBottom: 40 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 22, marginTop: 4 },
   logoBadge: {
@@ -318,6 +476,29 @@ const styles = StyleSheet.create({
   statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
   dot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
   subtitle: { fontSize: 12.5, fontWeight: '600' },
+
+  authContainer: { flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center' },
+  authSubtitle: { color: COLORS.textSecondary, fontSize: 13, marginTop: 6, marginBottom: 24 },
+  input: {
+    width: '100%',
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: COLORS.textPrimary,
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  authError: { color: '#f2746b', fontSize: 12.5, marginBottom: 10, textAlign: 'center' },
+  authHint: {
+    color: COLORS.textTertiary,
+    fontSize: 11.5,
+    textAlign: 'center',
+    marginTop: 18,
+    lineHeight: 17,
+  },
 
   ringCard: {
     backgroundColor: COLORS.card,
