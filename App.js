@@ -9,7 +9,6 @@ import {
   SafeAreaView,
   Modal,
 } from 'react-native';
-import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 
 const COLORS = {
   bgPhone: '#0e1226',
@@ -31,46 +30,18 @@ const LOCK_OPTIONS = [
   { label: '5 лет', tag: 'максимум', days: 1825 },
 ];
 
-const RING_RADIUS = 44;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-
-function ProgressRing({ progress, centerNumber, centerLabel, active }) {
-  const offset = RING_CIRCUMFERENCE * (1 - progress);
+function ProgressRing({ centerNumber, centerLabel, active }) {
   return (
-    <View style={styles.ringWrap}>
-      <Svg width={104} height={104} viewBox="0 0 104 104">
-        <Defs>
-          <LinearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0%" stopColor={COLORS.teal} />
-            <Stop offset="100%" stopColor={COLORS.tealDim} />
-          </LinearGradient>
-        </Defs>
-        <Circle
-          cx="52"
-          cy="52"
-          r={RING_RADIUS}
-          stroke="#242849"
-          strokeWidth="8"
-          fill="none"
-        />
-        <Circle
-          cx="52"
-          cy="52"
-          r={RING_RADIUS}
-          stroke={active ? 'url(#ringGrad)' : '#3a3f66'}
-          strokeWidth="8"
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={RING_CIRCUMFERENCE}
-          strokeDashoffset={offset}
-          rotation="-90"
-          origin="52,52"
-        />
-      </Svg>
-      <View style={styles.ringCenter} pointerEvents="none">
-        <Text style={styles.ringCenterNum}>{centerNumber}</Text>
-        <Text style={styles.ringCenterLabel}>{centerLabel}</Text>
-      </View>
+    <View
+      style={[
+        styles.ringWrap,
+        {
+          borderColor: active ? COLORS.teal : '#3a3f66',
+        },
+      ]}
+    >
+      <Text style={styles.ringCenterNum}>{centerNumber}</Text>
+      <Text style={styles.ringCenterLabel}>{centerLabel}</Text>
     </View>
   );
 }
@@ -111,10 +82,6 @@ export default function App() {
 
   const daysRemaining = isLocked
     ? Math.max(0, Math.ceil((lockUntil - now) / (24 * 60 * 60 * 1000)))
-    : 0;
-
-  const ringProgress = isLocked
-    ? Math.min(1, 1 - (lockUntil - now) / (lockDays * 24 * 60 * 60 * 1000))
     : 0;
 
   const openDurationPicker = () => {
@@ -186,18 +153,14 @@ export default function App() {
           </View>
         </View>
 
-        {/* Ring card */}
         <View
           style={[
             styles.ringCard,
-            isLocked && {
-              borderColor: 'rgba(94,224,201,0.25)',
-            },
+            isLocked && { borderColor: 'rgba(94,224,201,0.25)' },
           ]}
         >
           <View style={styles.ringRow}>
             <ProgressRing
-              progress={isLocked ? ringProgress : 0}
               active={isLocked}
               centerNumber={isLocked ? daysRemaining : '—'}
               centerLabel={isLocked ? 'дней осталось' : 'не активно'}
@@ -230,7 +193,6 @@ export default function App() {
           </View>
         </View>
 
-        {/* Stats */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Text style={[styles.statNum, { color: COLORS.amber }]}>{blockedToday}</Text>
@@ -246,7 +208,6 @@ export default function App() {
           </View>
         </View>
 
-        {/* Activity */}
         <View style={styles.card}>
           <View style={styles.cardRowBetween}>
             <Text style={styles.cardTitle}>Последние блокировки</Text>
@@ -275,7 +236,6 @@ export default function App() {
         </Text>
       </ScrollView>
 
-      {/* Duration picker sheet */}
       <Modal visible={durationVisible} transparent animationType="slide">
         <View style={styles.sheetOverlay}>
           <View style={styles.sheet}>
@@ -304,7 +264,6 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* Confirm sheet */}
       <Modal visible={!!confirmOption} transparent animationType="slide">
         <View style={styles.sheetOverlay}>
           <View style={styles.sheet}>
@@ -369,8 +328,14 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   ringRow: { flexDirection: 'row', alignItems: 'center' },
-  ringWrap: { width: 104, height: 104, alignItems: 'center', justifyContent: 'center' },
-  ringCenter: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  ringWrap: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    borderWidth: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   ringCenterNum: { color: COLORS.textPrimary, fontSize: 17, fontWeight: '700' },
   ringCenterLabel: { color: COLORS.textTertiary, fontSize: 9, marginTop: 2 },
   ringInfo: { flex: 1, marginLeft: 16 },
