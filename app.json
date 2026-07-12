@@ -5,6 +5,10 @@
     "owner": "men77s-team",
     "version": "1.0.0",
     "orientation": "portrait",
+    "splash": {
+      "backgroundColor": "#000000",
+      "resizeMode": "contain"
+    },
     "android": {
       "package": "com.ildarzulfia.gamblingblocker"
     },
