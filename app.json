@@ -14,7 +14,7 @@
       "permissions": ["INTERNET", "BIND_VPN_SERVICE"]
     },
     "plugins": [
-      "./vpn-plugin.js"
+      "./vpn-plugin/vpn-plugin.js"
     ],
     "extra": {
       "eas": {
