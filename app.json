@@ -1,22 +1,7 @@
-{
-  "expo": {
-    "name": "Gambling Blocker",
-    "slug": "gambling-blocker",
-    "owner": "men77s-team",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "splash": {
-      "backgroundColor": "#000000",
-      "resizeMode": "contain"
-    },
-    "android": {
-      "package": "com.ildarzulfia.gamblingblocker",
-      "permissions": ["INTERNET"]
-    },
-    "extra": {
-      "eas": {
-        "projectId": "17f053e7-9e74-46a0-95a2-e5a2dde1ad9a"
-      }
-    }
-  }
-}
+"android": {
+  "package": "com.ildarzulfia.gamblingblocker",
+  "permissions": ["INTERNET", "BIND_VPN_SERVICE"]
+},
+"plugins": [
+  "./vpn-plugin.js"
+],
